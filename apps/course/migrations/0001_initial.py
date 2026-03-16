@@ -11,74 +11,74 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('course', '0001_initial'),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='Questions',
+            name='Course',
             fields=[
                 ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
                 ('created_at', models.DateTimeField(default=django.utils.timezone.now)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
                 ('deleted_at', models.DateTimeField(blank=True, null=True)),
                 ('is_deleted', models.BooleanField(default=False)),
-                ('question_text', models.TextField()),
-                ('points', models.IntegerField(default=0)),
+                ('title', models.CharField(max_length=120)),
+                ('desc', models.TextField()),
+                ('slug', models.SlugField(editable=False, max_length=120, unique=True)),
+                ('base_price', models.PositiveIntegerField()),
+                ('discount_price', models.PositiveIntegerField(blank=True, default=0, null=True)),
             ],
             options={
-                'db_table': 'questions',
+                'db_table': 'courses',
             },
         ),
         migrations.CreateModel(
-            name='QuizResult',
+            name='CourseUnit',
             fields=[
                 ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
                 ('created_at', models.DateTimeField(default=django.utils.timezone.now)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
                 ('deleted_at', models.DateTimeField(blank=True, null=True)),
                 ('is_deleted', models.BooleanField(default=False)),
-                ('correct_answers', models.PositiveIntegerField(default=0)),
-                ('wrong_answers', models.PositiveIntegerField(default=0)),
-                ('total_questions', models.PositiveIntegerField(default=0)),
-                ('total', models.DecimalField(decimal_places=2, default=0, max_digits=10)),
-                ('status', models.CharField(choices=[('PASSED', 'Passed'), ('FAILED', 'Failed')], default='FAILED', max_length=10)),
+                ('title', models.CharField(max_length=120)),
+                ('desc', models.TextField()),
             ],
             options={
-                'db_table': 'quiz_result',
+                'db_table': 'units',
             },
         ),
         migrations.CreateModel(
-            name='Variant',
+            name='Lessons',
             fields=[
                 ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
                 ('created_at', models.DateTimeField(default=django.utils.timezone.now)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
                 ('deleted_at', models.DateTimeField(blank=True, null=True)),
                 ('is_deleted', models.BooleanField(default=False)),
-                ('text', models.TextField()),
-                ('is_correct', models.BooleanField()),
+                ('title', models.CharField(max_length=120)),
+                ('desc', models.TextField()),
+                ('video', models.FileField(upload_to='lessons/video')),
+                ('presentation', models.FileField(upload_to='lessons/presentation')),
+                ('additional_task', models.CharField(max_length=120)),
             ],
             options={
-                'db_table': 'variants',
+                'db_table': 'lessons',
             },
         ),
         migrations.CreateModel(
-            name='Quiz',
+            name='CourseStudent',
             fields=[
                 ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
                 ('created_at', models.DateTimeField(default=django.utils.timezone.now)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
                 ('deleted_at', models.DateTimeField(blank=True, null=True)),
                 ('is_deleted', models.BooleanField(default=False)),
-                ('title', models.CharField(max_length=100)),
-                ('description', models.TextField()),
-                ('is_finished', models.BooleanField(default=False)),
-                ('due_at', models.DateTimeField(blank=True, null=True)),
-                ('lesson', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='quizzes', to='course.lessons')),
+                ('progress', models.PositiveIntegerField(default=0)),
+                ('status', models.CharField(choices=[('COMPLETED', 'Completed'), ('IN_PROGRESS', 'In Progress')], default='IN_PROGRESS', max_length=20)),
+                ('course', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='students', to='course.course')),
             ],
             options={
-                'db_table': 'quiz',
+                'db_table': 'course_student',
             },
         ),
     ]

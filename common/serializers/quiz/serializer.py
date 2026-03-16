@@ -1,68 +1,68 @@
-
-from rest_framework.serializers import ImageField, CharField
+from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer
+from apps.quiz.models.questions import Questions
+from apps.quiz.models.quiz import Quiz
+from apps.quiz.models.variants import Variant
+from common.serializers.questions.serializer import QuestionCreateSerializer, QuestionListSerializer
 
-from apps.questions.models import Questions
-from apps.quiz.models import Quiz
-from apps.variants.models import Variant
-from common.serializers.questions.serializer import QuestionCreateSerializer
-from common.utils import delete_files, save_unique_file
+
+class QuizAnswerItemSerializer(serializers.Serializer):
+    question = serializers.UUIDField()
+    variant = serializers.UUIDField()
+
+
+class QuizSubmitSerializer(serializers.Serializer):
+    answers = QuizAnswerItemSerializer(many=True)
+
 
 
 class QuizListSerializer(ModelSerializer):
+    course_name = serializers.CharField(read_only=True, source='lesson.courses.title')
+    questions_count = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Quiz
         fields = [
                   "id",
-                  "quiz_img",
+                  "course_name",
                   "title",
                   "description",
-                  "password",
-                  "time_limit",
                   "is_finished",
-                  "slug"
+                  "due_at",
+                  "questions_count"
                   ]
 
 
 class QuizDetailSerializer(ModelSerializer):
 
-    questions = QuestionCreateSerializer(many=True, read_only=True)
+    questions = QuestionListSerializer(many=True, read_only=True)
 
     class Meta:
         model = Quiz
         fields = [
                   "id",
-                  "quiz_img",
+                  "lesson",
                   "title",
                   "description",
-                  "password",
-                  "time_limit",
                   "questions",
                   "is_finished",
-                  "slug"
+                  "due_at"
                   ]
 
 
 
 class QuizCreateSerializer(ModelSerializer):
-    quiz_img = ImageField(required=False)
-    password = CharField(required=False)
     questions = QuestionCreateSerializer(many=True, required=False)
 
     class Meta:
         model = Quiz
-        fields = ["quiz_img", "title", "description", "password", "time_limit", "questions"]
+        fields = ["lesson", "title", "description", "questions"]
 
     def create(self, validated_data):
         questions_data = validated_data.pop("questions")
-        quiz_img = validated_data.pop("quiz_img", None)
 
         # Quiz yaratish
         quiz = Quiz.objects.create(**validated_data)
-        if quiz_img:
-            quiz.quiz_img = quiz_img
-            quiz.save()
 
         # Har bir question va uning variantlarini yaratish
         for question_data in questions_data:
@@ -77,26 +77,13 @@ class QuizCreateSerializer(ModelSerializer):
 
 
 class QuizUpdateSerializer(ModelSerializer):
-    quiz_img = ImageField(required=False, allow_null=True)
     questions = QuestionCreateSerializer(many=True, required=False)
 
     class Meta:
         model = Quiz
-        fields = ["quiz_img", "title", "description", "time_limit", "questions"]
+        fields = ["lesson", "title", "description", "questions"]
 
     def update(self, instance, validated_data):
-        # --- Image handling ---
-        new_image = validated_data.pop("quiz_img", None)
-
-        if new_image is None and "quiz_img" in self.initial_data:
-            if instance.quiz_img:
-                delete_files([instance.quiz_img.url])
-                instance.quiz_img = None
-
-        elif new_image:
-            if instance.quiz_img:
-                delete_files([instance.quiz_img.url])
-            instance.quiz_img = save_unique_file(new_image, "quiz_images")
 
         # --- Update Quiz fields ---
         for attr, value in validated_data.items():

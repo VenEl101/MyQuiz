@@ -1,7 +1,17 @@
 from rest_framework.serializers import ModelSerializer
 
-from apps.questions.models import Questions
+from apps.quiz.models.questions import Questions
 from common.serializers.variants.serializer import VariantCreateSerializer
+
+
+
+
+class QuestionListSerializer(ModelSerializer):
+    variants = VariantCreateSerializer(read_only=True, many=True)
+
+    class Meta:
+        model = Questions
+        fields = ["id", "question_text", "points", "variants"]
 
 
 class QuestionCreateSerializer(ModelSerializer):
@@ -9,6 +19,6 @@ class QuestionCreateSerializer(ModelSerializer):
 
     class Meta:
         model = Questions
-        fields = ["text", "points", "variants"]
+        fields = ["question_text", "points", "variants"]
 
 

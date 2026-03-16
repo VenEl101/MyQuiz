@@ -1,55 +1,58 @@
-import secrets
 from django.contrib.auth import authenticate
 from rest_framework import serializers
 from apps.user.models import User
 from django.contrib.auth.password_validation import validate_password
 
 
-class TelegramUserRegisterSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = User
-        fields = ["phone", "first_name", "lastname"]
 
-    def create(self, validated_data):
-        # Random temporary password yaratish
-        temp_password = secrets.token_urlsafe(16)
+class RegisterSerializer(serializers.Serializer):
+    username = serializers.CharField(required=True)
+    email = serializers.EmailField(required=True)
+    password = serializers.CharField(required=True, write_only=True)
 
-        user = User(
-            phone=validated_data["phone"],
-            first_name=validated_data["first_name"],
-            lastname=validated_data["lastname"],
-            username=validated_data["phone"]
-        )
-        user.save()
+    def validate(self, data):
+        email = data.get("email")
+        username = data.get("username")
 
-        # Shu random password kerak bo'lsa, qaytarish mumkin (faqat logikada)
-        user.temp_password = temp_password
-        return user
+        if User.objects.filter(email=email).exists():
+            raise serializers.ValidationError("Email already exists.")
+
+        if User.objects.filter(username=username).exists():
+            raise serializers.ValidationError("Username already exists.")
+
+        return data
+
+
+class VerifySerializer(serializers.Serializer):
+    email = serializers.EmailField(required=True)
+    code = serializers.CharField(required=True)
 
 
 
 class LoginSerializer(serializers.Serializer):
-    phone = serializers.CharField(required=True)
+    email = serializers.CharField(required=True)
     password = serializers.CharField(required=True, write_only=True)
 
     def validate(self, data):
-        phone = data.get("phone")
+        email = data.get("email")
         password = data.get("password")
 
-        # Foydalanuvchini topish
         try:
-            user = User.objects.get(phone=phone)
+            user = User.objects.get(email=email)
         except User.DoesNotExist:
-            raise serializers.ValidationError({"phone": "User with this phone does not exist."})
+            raise serializers.ValidationError(
+                {"email": "User with this email does not exist."}
+            )
 
-        if user.is_temporary_password:
-            data["user"] = user
-            return data
+        authenticated_user = authenticate(
+            email=user.email,
+            password=password,
+        )
 
-        # Normal credential tekshirish
-        authenticated_user = authenticate(username=user.username, password=password)
         if not authenticated_user:
-            raise serializers.ValidationError({"password": "Incorrect password."})
+            raise serializers.ValidationError(
+                {"password": "Incorrect password."}
+            )
 
         data["user"] = authenticated_user
         return data

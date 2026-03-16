@@ -39,6 +39,20 @@ user_schema_view = get_schema_view(
     ]
 )
 
+teachers_schema_view = get_schema_view(
+    openapi.Info(
+        title="Save Meal User API",
+        default_version='v1',
+        description="Swagger documentation for User API endpoints.",
+        contact=openapi.Contact(email="user@savemeal.uz"),
+        license=openapi.License(name="BSD License"),
+    ),
+    public=True,
+    patterns=[
+        path('api/teachers/', include('api.teachers.urls')),
+    ]
+)
+
 
 
 router = DefaultRouter()
@@ -52,6 +66,7 @@ urlpatterns = [
     # API routes
     # path('api/admins/', include('api.admin.urls')),
     path('api/users/', include('api.users.urls')),
+    path('api/teachers/', include('api.teachers.urls')),
 
 
     # --- Admin Swagger Docs ---
@@ -59,6 +74,7 @@ urlpatterns = [
     #
     # --- User Swagger Docs ---
     path('swagger/users/', user_schema_view.with_ui('swagger', cache_timeout=0), name='user-swagger-ui'),
+    path('swagger/teachers/', teachers_schema_view.with_ui('swagger', cache_timeout=0), name='user-swagger-ui'),
 
     # --- Business Swagger Docs ---
 ] + router.urls

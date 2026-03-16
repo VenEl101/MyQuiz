@@ -7,7 +7,7 @@ import json, os
 file_lock = Lock()
 
 def welcome(request):
-    return HttpResponse("<h1>Welcome to the Django Application!</h1>")
+    return HttpResponse("<h1>Digital Academy Backend!</h1>")
 
 
 @api_view(['GET'])

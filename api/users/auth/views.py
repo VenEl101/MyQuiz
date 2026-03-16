@@ -1,69 +1,166 @@
-from rest_framework import status
-from rest_framework.generics import CreateAPIView, GenericAPIView
+from django.conf import settings
+from django.core.mail import send_mail
+from rest_framework import status, viewsets
+from rest_framework.decorators import action
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from apps.user.models import User
-from common.serializers.auth.serializer import TelegramUserRegisterSerializer, LoginSerializer, UpdatePasswordSerializer
+from apps.user.services.register import cache_register_data, verify_register_code
+from common.serializers.auth.serializer import (
+    RegisterSerializer,
+    VerifySerializer,
+    LoginSerializer,
+    UpdatePasswordSerializer,
+)
 
 
-class RegisterAPIView(CreateAPIView):
-    serializer_class = TelegramUserRegisterSerializer
+class AuthViewSet(viewsets.GenericViewSet):
+    permission_classes = [AllowAny]
 
+    def get_permissions(self):
+        if self.action == "update_password":
+            return [IsAuthenticated()]
+        return [AllowAny()]
 
-class LoginAPIView(GenericAPIView):
-    serializer_class = LoginSerializer
+    def get_serializer_class(self):
+        if self.action == "register":
+            return RegisterSerializer
+        elif self.action == "verify_code":
+            return VerifySerializer
+        elif self.action == "update_password":
+            return UpdatePasswordSerializer
+        return LoginSerializer
 
-    def post(self, request):
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="register",
+        permission_classes=[AllowAny],
+    )
+    def register(self, request):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        user = serializer.validated_data.get('user')
+        username = serializer.validated_data["username"]
+        email = serializer.validated_data["email"]
+        password = serializer.validated_data["password"]
 
+        code = cache_register_data(
+            username=username,
+            email=email,
+            password=password,
+        )
 
-        if user.is_temporary_password:
-            return Response({
-                "detail": "You need to set your password first.",
-                "user_id": user.id
-            }, status=400)
+        send_mail(
+            subject="Your verification code",
+            message=f"Your verification code is: {code}",
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[email],
+            fail_silently=False,
+        )
 
-        # JWT token yaratish
+        return Response(
+            {
+                "message": "Verification code sent successfully.",
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="verify-code",
+        permission_classes=[AllowAny],
+    )
+    def verify_code(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        email = serializer.validated_data["email"]
+        code = serializer.validated_data["code"]
+
+        user, error = verify_register_code(email=email, code=code)
+
+        if error:
+            return Response(
+                {"detail": error},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         refresh = RefreshToken.for_user(user)
-        access_token = str(refresh.access_token)
 
-        return Response({
-            "message": f"Welcome {user.first_name}!",
-            "user_id": user.id,
-            "phone": user.phone,
-            "access": access_token,
-            "refresh": str(refresh)
-        }, status=status.HTTP_200_OK)
+        return Response(
+            {
+                "message": "User registered successfully.",
+                "user": {
+                    "id": user.id,
+                    "username": user.username,
+                    "email": user.email,
+                },
+                "tokens": {
+                    "refresh": str(refresh),
+                    "access": str(refresh.access_token),
+                },
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
-
-
-class ResetPasswordAPIView(GenericAPIView):
-    serializer_class = UpdatePasswordSerializer
-
-    def patch(self, request, user_id):
-        try:
-            user = User.objects.get(id=user_id)
-        except User.DoesNotExist:
-            return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
-
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="login",
+        permission_classes=[AllowAny],
+    )
+    def login(self, request):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save(user=user)
 
-        # Yangi JWT token (faqat agar o'z useri bo'lsa qaytarish mumkin)
-        tokens = {}
-        if user == request.user:
-            refresh = RefreshToken.for_user(user)
-            tokens = {
-                "access": str(refresh.access_token),
-                "refresh": str(refresh)
-            }
+        user = serializer.validated_data["user"]
+        refresh = RefreshToken.for_user(user)
 
-        return Response({
-            "message": "Password updated successfully",
-            **tokens
-        }, status=status.HTTP_200_OK)
+        return Response(
+            {
+                "message": "Login successful.",
+                "requires_password_change": getattr(user, "is_temporary_password", False),
+                "user": {
+                    "id": user.id,
+                    "username": user.username,
+                    "email": user.email,
+                },
+                "tokens": {
+                    "refresh": str(refresh),
+                    "access": str(refresh.access_token),
+                },
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="update-password",
+        permission_classes=[IsAuthenticated],
+    )
+    def update_password(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user = serializer.save(user=request.user)
+        refresh = RefreshToken.for_user(user)
+
+        return Response(
+            {
+                "message": "Password updated successfully.",
+                "user": {
+                    "id": user.id,
+                    "username": user.username,
+                    "email": user.email,
+                },
+                "tokens": {
+                    "refresh": str(refresh),
+                    "access": str(refresh.access_token),
+                },
+            },
+            status=status.HTTP_200_OK,
+        )

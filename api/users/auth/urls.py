@@ -1,9 +1,10 @@
-from django.urls import path
+from rest_framework import routers
 
-from api.users.auth.views import RegisterAPIView, LoginAPIView, ResetPasswordAPIView
+from api.users.auth.views import AuthViewSet
 
-urlpatterns = [
-    path('register/', RegisterAPIView.as_view(), name='register'),
-    path('login/', LoginAPIView.as_view(), name='login'),
-    path('reset-password/<uuid:user_id>/password/', ResetPasswordAPIView.as_view(), name='reset-password'),
-]
+router = routers.DefaultRouter()
+
+
+router.register('', AuthViewSet, basename='auth')
+
+urlpatterns = router.urls

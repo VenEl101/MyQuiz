@@ -1,9 +1,9 @@
 from rest_framework.serializers import ModelSerializer
 
-from apps.variants.models import Variant
+from apps.quiz.models.variants import Variant
 
 
 class VariantCreateSerializer(ModelSerializer):
     class Meta:
         model = Variant
-        fields = ["text", "is_true"]
+        fields = ["id", "text", "is_correct"]
